@@ -1,5 +1,7 @@
 # graphql_encrypted
 
+The gem is published only on GitHub, not on RubyGems. Pin a release tag; `branch: 'master'` follows the latest commit.
+
 End-to-end encrypted GraphQL over HTTP for Rails. Every request is a JWE envelope sealed to the server key, every answer is sealed to a one-time key the client put inside the request. Mutations carry a session sequence number: they run once, in order, and a resend gets the original sealed answer back.
 
 - RSA-OAEP + A256GCM request envelope pinned to the server key, audience, method and path.
@@ -14,8 +16,10 @@ Requires Ruby 3.3+, Rails 7.1+, graphql-ruby 2.3+ and `openssl` 3.2+ (raw X25519
 ## Installation
 
 ```ruby
-gem 'graphql_encrypted'
+gem 'graphql_encrypted', github: 'noma4i/graphql_encrypted', tag: 'v0.1.0'
 ```
+
+The gem is published only on GitHub, not on RubyGems. Pin a release tag; `branch: 'master'` follows the latest commit.
 
 Run `bundle`, then `bin/rails generate graphql_encrypted:install` to write `config/initializers/graphql_encrypted.rb`: the three required settings (`private_key`, `audience`, `persisted_query_store`) and every optional one, commented out with its default. On the first boot in development the gem writes the same file by itself when it is missing; an existing file is never touched, and nothing is written in test or production.
 
