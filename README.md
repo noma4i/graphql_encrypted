@@ -82,6 +82,52 @@ end
 
 Each value is a plain object or a callable. Callables run on every use, so a key can rotate without a restart. A missing, unreadable or short key makes both endpoints answer `503`.
 
+## Keys
+
+The server and every client app hold key material. Get each item to the right place before the first request.
+
+| Item | Secret | Where it lives |
+| --- | --- | --- |
+| Server RSA private key, PEM, at least 3072 bits (`GraphqlEncrypted::MIN_KEY_BITS`) | yes | The server secret store only, read through `private_key`. |
+| Server public key, PEM | no | Built into every client app. |
+| `kid`, the pin: hex SHA-256 of the public key DER (SubjectPublicKeyInfo) | no | Built into every client app next to the public key. The server computes it from the private key (`GraphqlEncrypted.kid`). |
+| `key_generator` secret (Rails `secret_key_base`) | yes | The server. It derives the `Secrets` and `Limiter` keys; a new value makes stored secrets unreadable. |
+| Socket X25519 keys | - | Created per connection, nothing to store. |
+| Client credential and state file | yes | The device: Keychain, EncryptedSharedPreferences, or a file with mode `0600` (`GraphqlEncrypted::Client` refuses other modes). |
+
+### Generate a server key
+
+```sh
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out server.pem
+openssl pkey -in server.pem -pubout -out server_public.pem
+openssl pkey -in server.pem -pubout -outform DER | openssl dgst -sha256 -r | cut -d' ' -f1
+```
+
+The last line prints the `kid`. It equals `GraphqlEncrypted.kid` on the server and `Digest::SHA256.hexdigest(OpenSSL::PKey::RSA.new(File.read('server_public.pem')).public_key.to_der)` in Ruby. Make one key per environment (development, staging, production): each has its own `kid`.
+
+### Store the private key
+
+- Put `server.pem` into the secret store of the deployment and expose it to the app as one value (for example an environment variable read by `private_key`). Keep the PEM line breaks: in a `.env` file use a double-quoted multi-line value.
+- Never commit it, never bake it into an image, never log it, never ship it in a client.
+- Delete the local `server.pem` after the upload. Keep `server_public.pem` and the `kid`: they are public and go to the clients.
+- Check after a deploy: the `kid` that the socket `challenge` frame announces must equal the `kid` built into the clients. A missing or short key answers `503` on both endpoints.
+
+### Ship the public key to clients
+
+- Build the public PEM and the `kid` into the app. Do not download them at run time: whoever intercepts TLS could hand over another key.
+- Before the first request the client checks that the key has at least 3072 bits and that its SHA-256 DER equals the pin. `GraphqlEncrypted::Client` raises `Untrusted server key` otherwise; a native client must do the same.
+- The client `origin` must equal the server `audience` exactly (scheme, host, port), and one build talks to one environment: a development build carries the development key and `kid`.
+
+### Rotate the key
+
+The server has one active key. A request encrypted to the old key cannot be decrypted after the switch, and a socket hello with the old `kid` is refused. So a rotation breaks every app build that carries the old key:
+
+1. Generate the new key and its `kid`.
+2. Release client builds with the new public key and `kid`, and force the update of older builds.
+3. Replace the private key in the secret store. `private_key` is a callable, so the next request uses the new key without a restart.
+
+Rotate at once when the private key leaks; plan a forced client update for any other rotation. A client can compare the `kid` of the `challenge` frame with its own before the hello and ask for an update when they differ.
+
 ## Session table
 
 The session model keeps the sequence log. Include `GraphqlEncrypted::Session` in an ActiveRecord model whose table has these columns:
