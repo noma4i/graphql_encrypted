@@ -1,0 +1,62 @@
+# Settings of graphql_encrypted. A value is a plain object or a callable; callables are read on every use, so keys can rotate without a restart.
+GraphqlEncrypted.configure do |config|
+  # Required: PEM of the server RSA key, at least 3072 bits.
+  config.private_key = -> { ENV.fetch('ENCRYPTION_PRIVATE_KEY') }
+  # Required: origin the clients address, for example https://api.example.com.
+  config.audience = -> { ENV.fetch('API_HOST') }
+  # Required: object with fetch_query(sha) and save_query(sha, query) for persisted queries.
+  config.persisted_query_store = -> { MySchema.persisted_query_store }
+
+  # Payload encryption (GraphqlEncrypted::PayloadMiddleware): shared secret, no default; blank raises KeyError.
+  # config.payload_secret = -> { ENV.fetch('PAYLOAD_ENCRYPTION_SECRET') }
+  # Paths the payload middleware serves, default ['/'].
+  # config.payload_paths = ['/']
+  # Callable request -> Hash added to the Sentry warning for a payload that cannot be decrypted, default {}.
+  # config.payload_failure_context = ->(request) { {} }
+
+  # Headers that make a request invalid on top of Authorization and Cookie, default [].
+  # config.refuse_headers = %w[X-Legacy-Auth]
+  # Object with generate_key(salt, size) for Secrets and Limiter, no default.
+  # config.key_generator = -> { Rails.application.key_generator }
+  # Cache store with increment and write for Limiter, no default.
+  # config.cache = -> { Rails.cache }
+  # Logger that answers silence; requests run with it silenced below WARN, no default.
+  # config.logger = -> { Rails.logger }
+  # Callable (user, &run) that runs the block with the current user, default none.
+  # config.with_user = ->(user, &run) { Current.set(user: user, &run) }
+  # Called with errors that make an endpoint answer 503 and with errors of GraphqlEncrypted::Errors, default no-op.
+  # config.error_reporter = ->(error) { Rails.error.report(error) }
+
+  # Counter of GraphqlEncrypted::Limiter; session_start (30 per 10 minutes per remote address) is declared by default.
+  # config.limit :session_start, limit: 30, window: 10.minutes, enabled: -> { !Rails.env.development? }
+
+  # Sentry reporting of the requests the gem serves, default false.
+  # config.sentry = true
+  # Tag under which the gem's events are marked, default 'graphql_encrypted'.
+  # config.sentry_namespace = 'graphql_encrypted'
+  # Parameter names filtered from reported requests, default [].
+  # config.filter_parameters = -> { Rails.application.config.filter_parameters }
+  # Error classes (names or callables) that are not reported, default [].
+  # config.expected_errors = %w[Google::Auth::IDTokens::VerificationError]
+  # Tags read from the request body: name => body keys, default {}.
+  # config.body_tags = { platform: %w[platform], app_version: %w[version appVersion] }
+
+  # Path of the encrypted socket, default '/cable'.
+  # config.cable_path = '/cable'
+  # Channel class name the socket serves, no default.
+  # config.cable_channel = 'AppChannel'
+  # Protocol label bound into the frame keys, default 'graphql-encrypted-ws-v1'.
+  # config.cable_protocol_label = 'graphql-encrypted-ws-v1'
+  # Purpose bound into the hello token, default 'graphql_encrypted.ws.hello'.
+  # config.cable_hello_purpose = 'graphql_encrypted.ws.hello'
+  # Redis for the socket limits and journal, no default.
+  # config.cable_redis = -> { Redis.new(url: ENV.fetch('REDIS_URL')) }
+  # Redis key namespace of the socket, default 'graphql_encrypted:cable'.
+  # config.cable_namespace = 'graphql_encrypted:cable'
+  # Log name of the socket journal, default 'graphql_encrypted.cable'.
+  # config.cable_log_name = 'graphql_encrypted.cable'
+  # Log one journal line per subscription update written to a socket (field name only), default false.
+  # config.cable_log_updates = false
+  # Overrides of GraphqlEncrypted::Cable::Limits::DEFAULTS, default {}.
+  # config.cable_limits = {}
+end
